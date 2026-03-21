@@ -66,6 +66,8 @@ jobs:
     steps:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - name: Deploy artifact to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
