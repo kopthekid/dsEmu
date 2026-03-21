@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <link rel="icon" type="x-icon" href="../../images/favicon.ico">
+      <link rel="stylesheet" href="../../style.css" />
+        </head>
+<body>
+    <desmond-player id="player"></desmond-player>
+    <script src="../../data/ds.js"></script>
+  <script>
+      var player = document.getElementById("player");
+      player.loadURL("Super MarioDS.nds", function(){
+         player.enableMicrophone();
+      })
+  </script>
+</body>
+
+</html>
