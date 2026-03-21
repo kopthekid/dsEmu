@@ -6,6 +6,11 @@
         </head>
 <body>
     <desmond-player id="player"></desmond-player>
+      <div id="save-tools">
+         <button id="export-save" type="button">Export Save</button>
+         <label for="import-save" id="import-save-label">Import Save</label>
+         <input id="import-save" type="file" accept=".dsv,application/octet-stream" hidden>
+      </div>
     <div id="rom-fallback" hidden>
       <p>Could not auto-load <strong>rom.zip</strong>. Select your local <strong>.nds</strong> file to play:</p>
       <input id="rom-file" type="file" accept=".nds,application/octet-stream">
@@ -16,6 +21,28 @@
       var player = document.getElementById("player");
       var fallback = document.getElementById("rom-fallback");
       var romInput = document.getElementById("rom-file");
+      var exportSaveBtn = document.getElementById("export-save");
+      var importSaveInput = document.getElementById("import-save");
+      var saveMirrorPrefix = "platkaizo-save-v1";
+
+      function setupSaveToolsStyle() {
+         var tools = document.getElementById("save-tools");
+         tools.style.display = "flex";
+         tools.style.gap = "10px";
+         tools.style.alignItems = "center";
+         tools.style.margin = "8px 0 14px";
+
+         exportSaveBtn.style.cursor = "pointer";
+         exportSaveBtn.style.padding = "8px 12px";
+
+         var importLabel = document.getElementById("import-save-label");
+         importLabel.style.cursor = "pointer";
+         importLabel.style.padding = "8px 12px";
+         importLabel.style.border = "1px solid #666";
+         importLabel.style.borderRadius = "4px";
+      }
+
+      setupSaveToolsStyle();
 
       function applyScreenLayout() {
          if (!player.shadowRoot) return;
@@ -44,6 +71,7 @@
       function loadRomURL(url) {
          player.loadURL(url, function () {
             player.enableMicrophone();
+            startSaveMirrorLoop();
 
             if (url.indexOf("blob:") === 0) {
                setTimeout(function () {
@@ -86,6 +114,110 @@
          }
       }
 
+      function bytesToBase64(bytes) {
+         var chunkSize = 0x8000;
+         var binary = "";
+         for (var i = 0; i < bytes.length; i += chunkSize) {
+            var chunk = bytes.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+         }
+         return btoa(binary);
+      }
+
+      function base64ToBytes(base64) {
+         var binary = atob(base64);
+         var bytes = new Uint8Array(binary.length);
+         for (var i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+         }
+         return bytes;
+      }
+
+      function currentSaveId() {
+         if (typeof window.gameID === "string" && window.gameID.trim()) {
+            return window.gameID;
+         }
+         return localStorage.getItem(saveMirrorPrefix + ":last") || "PLAT_KAIZO";
+      }
+
+      async function restoreMirroredSave() {
+         if (!window.localforage) return;
+
+         var saveId = currentSaveId();
+         var localforageKey = "sav-" + saveId;
+         var existing = await localforage.getItem(localforageKey);
+         if (existing && existing.length) return;
+
+         var saved = localStorage.getItem(saveMirrorPrefix + ":" + saveId);
+         if (!saved) return;
+
+         await localforage.setItem(localforageKey, base64ToBytes(saved));
+      }
+
+      async function mirrorSaveToLocalStorage() {
+         if (!window.localforage) return;
+
+         var saveId = currentSaveId();
+         var localforageKey = "sav-" + saveId;
+         var data = await localforage.getItem(localforageKey);
+         if (!data || !data.length) return;
+
+         var bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+         localStorage.setItem(saveMirrorPrefix + ":" + saveId, bytesToBase64(bytes));
+         localStorage.setItem(saveMirrorPrefix + ":last", saveId);
+      }
+
+      async function exportCurrentSave() {
+         if (!window.localforage) {
+            alert("Save storage is not ready yet.");
+            return;
+         }
+
+         var saveId = currentSaveId();
+         var data = await localforage.getItem("sav-" + saveId);
+         if (!data || !data.length) {
+            alert("No save found yet. Save in-game first.");
+            return;
+         }
+
+         var bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+         var blob = new Blob([bytes], { type: "application/octet-stream" });
+         var url = URL.createObjectURL(blob);
+
+         var link = document.createElement("a");
+         link.href = url;
+         link.download = "platkaizo-save.dsv";
+         link.click();
+
+         setTimeout(function () {
+            URL.revokeObjectURL(url);
+         }, 3000);
+      }
+
+      async function importSaveFile(file) {
+         if (!file) return;
+         if (!window.localforage) {
+            alert("Save storage is not ready yet.");
+            return;
+         }
+
+         var bytes = new Uint8Array(await file.arrayBuffer());
+         var saveId = currentSaveId();
+         await localforage.setItem("sav-" + saveId, bytes);
+         localStorage.setItem(saveMirrorPrefix + ":" + saveId, bytesToBase64(bytes));
+         localStorage.setItem(saveMirrorPrefix + ":last", saveId);
+         alert("Save imported. Reloading game...");
+         location.reload();
+      }
+
+      var saveMirrorTimer = null;
+      function startSaveMirrorLoop() {
+         if (saveMirrorTimer) return;
+         saveMirrorTimer = setInterval(function () {
+            mirrorSaveToLocalStorage().catch(function () {});
+         }, 5000);
+      }
+
       romInput.addEventListener("change", async function (event) {
          var file = event.target.files && event.target.files[0];
          if (!file) return;
@@ -94,7 +226,23 @@
          loadRomURL(localURL);
       });
 
-      loadRomFromZip();
+      exportSaveBtn.addEventListener("click", function () {
+         exportCurrentSave().catch(function () {
+            alert("Could not export save.");
+         });
+      });
+
+      importSaveInput.addEventListener("change", function (event) {
+         var file = event.target.files && event.target.files[0];
+         importSaveFile(file).catch(function () {
+            alert("Could not import save file.");
+         });
+         importSaveInput.value = "";
+      });
+
+      restoreMirroredSave().catch(function () {}).finally(function () {
+         loadRomFromZip();
+      });
   </script>
 </body>
 
