@@ -17,31 +17,15 @@
       var fallback = document.getElementById("rom-fallback");
       var romInput = document.getElementById("rom-file");
 
-      function waitForRomLoader(retries) {
-         return new Promise(function (resolve, reject) {
-            if (typeof tryLoadROM === "function") {
-               resolve();
-               return;
-            }
-
-            if (retries <= 0) {
-               reject(new Error("ROM loader not ready"));
-               return;
-            }
-
-            setTimeout(function () {
-               waitForRomLoader(retries - 1).then(resolve).catch(reject);
-            }, 150);
-         });
-      }
-
-      function loadRomFile(file) {
-         waitForRomLoader(40).then(function () {
-            return tryLoadROM(file);
-         }).then(function () {
+      function loadRomURL(url) {
+         player.loadURL(url, function () {
             player.enableMicrophone();
-         }).catch(function () {
-            alert("ROM loader is not ready yet. Please refresh and try again.");
+
+            if (url.indexOf("blob:") === 0) {
+               setTimeout(function () {
+                  URL.revokeObjectURL(url);
+               }, 3000);
+            }
          });
       }
 
@@ -70,9 +54,9 @@
 
             var romPath = ndsFiles[0];
             var romBuffer = await zip.files[romPath].async("arraybuffer");
-            var romName = romPath.split("/").pop() || "platKaizo4E.nds";
-            var romFile = new File([romBuffer], romName, { type: "application/octet-stream" });
-            loadRomFile(romFile);
+            var romBlob = new Blob([romBuffer], { type: "application/octet-stream" });
+            var romURL = URL.createObjectURL(romBlob);
+            loadRomURL(romURL);
          } catch (error) {
             fallback.hidden = false;
          }
@@ -82,7 +66,8 @@
          var file = event.target.files && event.target.files[0];
          if (!file) return;
 
-         loadRomFile(file);
+         var localURL = URL.createObjectURL(file);
+         loadRomURL(localURL);
       });
 
       loadRomFromZip();

@@ -15,11 +15,9 @@ div {
   border-radius: 25px;
   height: 300px;
   width: 1000px;
-  background: linear-gradient(to bottom, #000000 0%, #020094 100%);
 }
 
 body {
-  background-image: url("https://raw.githubusercontent.com/CoolAn127Gamer/DS-Emulator-Web/gh-pages/images/bg(DS).jpg");
   display: flex;
   align-items: center;
   justify-content: center;
