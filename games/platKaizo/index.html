@@ -6,12 +6,86 @@
         </head>
 <body>
     <desmond-player id="player"></desmond-player>
+    <div id="rom-fallback" hidden>
+      <p>Could not auto-load <strong>rom.zip</strong>. Select your local <strong>.nds</strong> file to play:</p>
+      <input id="rom-file" type="file" accept=".nds,application/octet-stream">
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="../../data/ds.js"></script>
   <script>
       var player = document.getElementById("player");
-      player.loadURL("platKaizo4E.nds", function(){
-         player.enableMicrophone();
-      })
+      var fallback = document.getElementById("rom-fallback");
+      var romInput = document.getElementById("rom-file");
+
+      function waitForRomLoader(retries) {
+         return new Promise(function (resolve, reject) {
+            if (typeof tryLoadROM === "function") {
+               resolve();
+               return;
+            }
+
+            if (retries <= 0) {
+               reject(new Error("ROM loader not ready"));
+               return;
+            }
+
+            setTimeout(function () {
+               waitForRomLoader(retries - 1).then(resolve).catch(reject);
+            }, 150);
+         });
+      }
+
+      function loadRomFile(file) {
+         waitForRomLoader(40).then(function () {
+            return tryLoadROM(file);
+         }).then(function () {
+            player.enableMicrophone();
+         }).catch(function () {
+            alert("ROM loader is not ready yet. Please refresh and try again.");
+         });
+      }
+
+      async function loadRomFromZip() {
+         try {
+            var response = await fetch("rom.zip", { cache: "no-store" });
+            if (!response.ok) {
+               throw new Error("Could not fetch rom.zip");
+            }
+
+            var blob = await response.blob();
+
+            if (!window.JSZip) {
+               throw new Error("JSZip not available");
+            }
+
+            var zip = await JSZip.loadAsync(blob);
+            var ndsFiles = Object.keys(zip.files).filter(function (name) {
+               var entry = zip.files[name];
+               return !entry.dir && name.toLowerCase().endsWith(".nds");
+            });
+
+            if (!ndsFiles.length) {
+               throw new Error("No .nds file found in rom.zip");
+            }
+
+            var romPath = ndsFiles[0];
+            var romBuffer = await zip.files[romPath].async("arraybuffer");
+            var romName = romPath.split("/").pop() || "platKaizo4E.nds";
+            var romFile = new File([romBuffer], romName, { type: "application/octet-stream" });
+            loadRomFile(romFile);
+         } catch (error) {
+            fallback.hidden = false;
+         }
+      }
+
+      romInput.addEventListener("change", async function (event) {
+         var file = event.target.files && event.target.files[0];
+         if (!file) return;
+
+         loadRomFile(file);
+      });
+
+      loadRomFromZip();
   </script>
 </body>
 
