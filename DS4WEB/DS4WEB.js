@@ -1727,14 +1727,22 @@ if (player) {
         };
     };
     var prevRunFrameTime = performance.now();
+    var speedFrameDebt = 0;
     function emuLoop() {
         if (window.requestAnimationFrame(emuLoop), emuIsRunning) {
-            var speedMultiplier = Math.max(1, Math.floor(window.__dsSpeedMultiplier || 1));
-            if (config.powerSave && 1 === speedMultiplier && performance.now() - prevRunFrameTime < 32) {
+            var speedMultiplier = Number(window.__dsSpeedMultiplier || 1);
+            speedMultiplier = isFinite(speedMultiplier) ? speedMultiplier : 1;
+            speedMultiplier = Math.max(1, Math.min(4, speedMultiplier));
+            if (config.powerSave && speedMultiplier <= 1 && performance.now() - prevRunFrameTime < 32) {
                 return;
             };
+
             prevRunFrameTime = performance.now();
-            for (var i = 0; i < speedMultiplier; i++) {
+            speedFrameDebt = Math.min(12, speedFrameDebt + speedMultiplier);
+            var framesToRun = Math.max(1, Math.floor(speedFrameDebt));
+            speedFrameDebt -= framesToRun;
+
+            for (var i = 0; i < framesToRun; i++) {
                 emuRunFrame();
             };
         };
@@ -1760,9 +1768,27 @@ if (player) {
         var tag = target.tagName;
         return "INPUT" === tag || "TEXTAREA" === tag || "BUTTON" === tag || "SELECT" === tag || "OPTION" === tag || "LABEL" === tag;
     };
+    function isLauncherUIInteractionEvent(event) {
+        if (event) {
+            if (isLauncherUIEventTarget(event.target)) {
+                return !0;
+            };
+
+            if ("function" == typeof event.composedPath) {
+                var path = event.composedPath();
+                for (var i = 0; i < path.length; i++) {
+                    if (isLauncherUIEventTarget(path[i])) {
+                        return !0;
+                    };
+                };
+            };
+        };
+
+        return isLauncherUIEventTarget(document.activeElement);
+    };
     function handleTouch(t) {
         if (tryInitSound(), emuIsRunning) {
-            if (isLauncherUIEventTarget(t.target)) {
+            if (isLauncherUIInteractionEvent(t)) {
                 return;
             };
             t.preventDefault(), t.stopPropagation();
@@ -1808,7 +1834,7 @@ if (player) {
         window.addEventListener(e, handleTouch);
     }), window.onmousedown = window.onmouseup = window.onmousemove = (e => {
         if (emuIsRunning) {
-            if (isLauncherUIEventTarget(e.target)) {
+            if (isLauncherUIInteractionEvent(e)) {
                 return;
             };
             "mousedown" == e.type && tryInitSound();

@@ -7,8 +7,11 @@
   <body>
     <div id="toolbar">
       <button id="export-save" type="button">Export Save (.dsv)</button>
+      <button id="import-save" type="button">Import Save</button>
+      <input id="import-save-file" type="file" accept=".dsv,.sav,application/octet-stream" hidden>
       <label for="speed-slider" id="speed-label">Speed: <span id="speed-value">1x</span></label>
-      <input id="speed-slider" type="range" min="1" max="8" step="1" value="1">
+      <input id="speed-slider" type="range" min="1" max="4" step="0.1" value="1">
+      <input id="speed-input" type="number" min="1" max="4" step="0.1" value="1" aria-label="Speed multiplier">
       <label id="time-toggle-wrap"><input id="use-custom-time" type="checkbox"> Custom Time</label>
       <input id="custom-time" type="datetime-local" step="1" disabled>
       <button id="sync-time" type="button">Use Current Time</button>
@@ -31,7 +34,10 @@
   </body>
   <script>
     const exportSaveBtn = document.getElementById('export-save');
+    const importSaveBtn = document.getElementById('import-save');
+    const importSaveFileInput = document.getElementById('import-save-file');
     const speedSlider = document.getElementById('speed-slider');
+    const speedInput = document.getElementById('speed-input');
     const speedValue = document.getElementById('speed-value');
     const useCustomTimeCheckbox = document.getElementById('use-custom-time');
     const customTimeInput = document.getElementById('custom-time');
@@ -226,6 +232,43 @@
       setSaveStatus('Save exported.');
     }
 
+    async function importSaveFile(file) {
+      const activeGameId = window.gameID || currentGameId;
+      if (!activeGameId) {
+        setSaveStatus('Load ROM first, then import save.');
+        return;
+      }
+
+      if (!file) {
+        setSaveStatus('No save file selected.');
+        return;
+      }
+
+      if (file.size > 2306867.2) {
+        setSaveStatus('File too large to be a DS save.');
+        return;
+      }
+
+      const data = new Uint8Array(await file.arrayBuffer());
+
+      if (window.localforage && typeof localforage.setItem === 'function') {
+        await localforage.setItem(`sav-${activeGameId}`, data);
+      }
+
+      if (
+        window.Module &&
+        typeof Module._savGetPointer === 'function' &&
+        typeof Module._savUpdateChangeFlag === 'function' &&
+        Module.HEAPU8
+      ) {
+        const ptr = Module._savGetPointer(data.length);
+        Module.HEAPU8.set(data, ptr);
+        Module._savUpdateChangeFlag();
+      }
+
+      setSaveStatus('Save imported. If not reflected, reload the page.');
+    }
+
     exportSaveBtn.addEventListener('click', () => {
       exportSaveFile().catch((err) => {
         console.error(err);
@@ -233,14 +276,50 @@
       });
     });
 
+    importSaveBtn.addEventListener('click', () => {
+      importSaveFileInput.click();
+    });
+
+    importSaveFileInput.addEventListener('change', () => {
+      const [file] = importSaveFileInput.files || [];
+      importSaveFile(file)
+        .catch((err) => {
+          console.error(err);
+          setSaveStatus('Save import failed.');
+        })
+        .finally(() => {
+          importSaveFileInput.value = '';
+        });
+    });
+
+    function normalizeSpeed(value) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return 1;
+      }
+
+      const clamped = Math.max(1, Math.min(4, parsed));
+      return Math.round(clamped * 10) / 10;
+    }
+
     function updateSpeedControl(multiplier) {
-      const speed = Math.max(1, Math.min(8, multiplier));
+      const speed = normalizeSpeed(multiplier);
       window.__dsSpeedMultiplier = speed;
-      speedValue.textContent = `${speed}x`;
+      speedSlider.value = String(speed);
+      speedInput.value = String(speed);
+      speedValue.textContent = Number.isInteger(speed) ? `${speed}x` : `${speed.toFixed(1)}x`;
     }
 
     speedSlider.addEventListener('input', () => {
       updateSpeedControl(Number(speedSlider.value));
+    });
+
+    speedInput.addEventListener('input', () => {
+      updateSpeedControl(speedInput.value);
+    });
+
+    speedInput.addEventListener('blur', () => {
+      updateSpeedControl(speedInput.value);
     });
 
     useCustomTimeCheckbox.addEventListener('change', () => {
@@ -381,6 +460,20 @@
       background: #e8c547;
     }
 
+    #import-save {
+      background: #8eb84a;
+      color: #111;
+      border: none;
+      padding: 8px 12px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #import-save:hover {
+      background: #a1cb58;
+    }
+
     #save-status {
       min-height: 1.2em;
       font-size: 0.95rem;
@@ -396,6 +489,15 @@
       width: 180px;
       accent-color: #7ecf6a;
       cursor: pointer;
+    }
+
+    #speed-input {
+      width: 72px;
+      background: #191919;
+      color: #f5f5f5;
+      border: 1px solid #5a5a5a;
+      border-radius: 6px;
+      padding: 6px 8px;
     }
 
     #time-toggle-wrap {
