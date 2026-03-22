@@ -130,21 +130,35 @@
     }
 
     function addCheatCode(line) {
-      const ptr = writeCString(line);
-      try {
-        if (typeof Module._chtAddItem !== 'function') {
-          throw new Error('Cheat API not available.');
-        }
-
-        // Some builds use 1 arg (code string), some use 2 args (code, enabled).
-        try {
-          Module._chtAddItem(ptr);
-        } catch {
-          Module._chtAddItem(ptr, 1);
-        }
-      } finally {
-        Module._free(ptr);
+      if (typeof Module._chtAddItem !== 'function') {
+        throw new Error('Cheat API not available.');
       }
+
+      const variants = [line];
+      const compact = line.replace(/\s+/g, '');
+      if (/^[0-9a-fA-F]{16}$/.test(compact)) {
+        variants.push(compact.toUpperCase());
+        variants.push(`${compact.slice(0, 8).toUpperCase()} ${compact.slice(8).toUpperCase()}`);
+      }
+
+      for (const payload of variants) {
+        const ptr = writeCString(payload);
+        try {
+          // Some builds use 1 arg (code string), some use 2 args (code, enabled).
+          try {
+            Module._chtAddItem(ptr);
+          } catch {
+            Module._chtAddItem(ptr, 1);
+          }
+          return;
+        } catch {
+          // Try next variant.
+        } finally {
+          Module._free(ptr);
+        }
+      }
+
+      throw new Error('Cheat line rejected by parser.');
     }
 
     function deriveGameId(headerBytes, fallbackName) {
@@ -369,19 +383,35 @@
       }
 
       let applied = 0;
+      const failed = [];
+
+      // Some AR engines expect the whole multi-line cheat as one payload.
+      if (lines.length > 1) {
+        try {
+          addCheatCode(lines.join('\n'));
+          applied = 1;
+          setSaveStatus('Applied cheat block.');
+          refreshCheatList();
+          return;
+        } catch {
+          // Fall back to line-by-line mode.
+        }
+      }
+
       for (const line of lines) {
         try {
           addCheatCode(line);
           applied += 1;
         } catch (err) {
-          console.error(err);
-          setSaveStatus(`Failed while applying cheat: ${line}`);
-          refreshCheatList();
-          return;
+          failed.push(line);
         }
       }
 
-      setSaveStatus(`Applied ${applied} cheat line(s).`);
+      if (failed.length) {
+        setSaveStatus(`Applied ${applied} line(s), failed ${failed.length}. Try a different AR format.`);
+      } else {
+        setSaveStatus(`Applied ${applied} cheat line(s).`);
+      }
       refreshCheatList();
     });
 
