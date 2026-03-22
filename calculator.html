@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platinum Kaizo Calculator Hub</title>
+    <style>
+      :root {
+        --bg: #0f1b24;
+        --panel: #182b38;
+        --panel-2: #223a4a;
+        --ink: #f3f7fa;
+        --muted: #a8bcc9;
+        --accent: #ffb84d;
+        --accent-2: #75d0ff;
+        --line: #355162;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: Verdana, sans-serif;
+        background: radial-gradient(circle at 10% 10%, #264257 0%, var(--bg) 55%);
+      }
+
+      .shell {
+        width: min(1200px, 100% - 24px);
+        margin: 12px auto;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--panel) 90%, black 10%);
+      }
+
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.05rem, 2.2vw, 1.4rem);
+        letter-spacing: 0.2px;
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .link-btn {
+        display: inline-block;
+        text-decoration: none;
+        color: #101820;
+        background: var(--accent);
+        border-radius: 7px;
+        padding: 7px 10px;
+        font-weight: 700;
+      }
+
+      .tabs {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tab {
+        border: 1px solid var(--line);
+        color: var(--ink);
+        background: var(--panel-2);
+        border-radius: 8px;
+        padding: 8px 10px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .tab[aria-selected="true"] {
+        border-color: var(--accent-2);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-2) 30%, transparent 70%);
+      }
+
+      .helper {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .viewer {
+        margin-top: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: #0b141b;
+      }
+
+      iframe {
+        width: 100%;
+        height: min(78vh, 900px);
+        border: 0;
+        background: #fff;
+      }
+
+      .actions {
+        margin-top: 10px;
+      }
+
+      .open-link {
+        text-decoration: none;
+        color: #11202e;
+        background: var(--accent-2);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <h1>Platinum Kaizo Calculator Hub</h1>
+        <nav class="links">
+          <a class="link-btn" href="launcher.html">Back to Emulator</a>
+          <a class="link-btn" href="info.html">Resources</a>
+        </nav>
+      </header>
+
+      <section class="tabs" role="tablist" aria-label="Calculator options">
+        <button id="tab-pk" class="tab" role="tab" aria-selected="true">PK Calc</button>
+        <button id="tab-emi" class="tab" role="tab" aria-selected="false">EMI Calc</button>
+      </section>
+
+      <p class="helper" id="helper-text">
+        Loaded: PK Calc. If embedding is blocked by the remote site, use the open button below.
+      </p>
+
+      <section class="viewer">
+        <iframe id="calc-frame" title="Pokemon calculator" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </section>
+
+      <section class="actions">
+        <a id="open-current" class="open-link" target="_blank" rel="noopener noreferrer">Open Current Calculator in New Tab</a>
+      </section>
+    </main>
+
+    <script>
+      const calculators = {
+        pk: {
+          label: 'PK Calc',
+          url: 'https://pkcalc.anastarawneh.com/'
+        },
+        emi: {
+          label: 'EMI Calc',
+          url: 'https://emi.dev/ck+/?pk#/calc/'
+        }
+      };
+
+      const frame = document.getElementById('calc-frame');
+      const openCurrent = document.getElementById('open-current');
+      const helperText = document.getElementById('helper-text');
+      const tabPk = document.getElementById('tab-pk');
+      const tabEmi = document.getElementById('tab-emi');
+
+      function setActiveTab(tabName) {
+        const calc = calculators[tabName];
+        if (!calc) {
+          return;
+        }
+
+        tabPk.setAttribute('aria-selected', String(tabName === 'pk'));
+        tabEmi.setAttribute('aria-selected', String(tabName === 'emi'));
+
+        frame.src = calc.url;
+        openCurrent.href = calc.url;
+        helperText.textContent = `Loaded: ${calc.label}. If embedding is blocked by the remote site, use the open button below.`;
+      }
+
+      tabPk.addEventListener('click', () => setActiveTab('pk'));
+      tabEmi.addEventListener('click', () => setActiveTab('emi'));
+
+      setActiveTab('pk');
+    </script>
+  </body>
+</html>
