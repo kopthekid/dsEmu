@@ -5,13 +5,303 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   </head>
   <body>
+    <div id="toolbar">
+      <button id="export-save" type="button">Export Save (.dsv)</button>
+      <label for="speed-slider" id="speed-label">Speed: <span id="speed-value">1x</span></label>
+      <input id="speed-slider" type="range" min="1" max="8" step="1" value="1">
+      <label id="time-toggle-wrap"><input id="use-custom-time" type="checkbox"> Custom Time</label>
+      <input id="custom-time" type="datetime-local" step="1" disabled>
+      <button id="sync-time" type="button">Use Current Time</button>
+      <span id="save-status" aria-live="polite"></span>
+    </div>
+    <div id="cheat-panel">
+      <label for="cheat-input" id="cheat-label">Cheat Codes (one line each)</label>
+      <textarea id="cheat-input" rows="4" placeholder="Example:\n94000130 FCFF0000\nB2101D40 00000000\n00000092 00000063"></textarea>
+      <div id="cheat-actions">
+        <button id="apply-cheats" type="button">Apply Cheats</button>
+        <button id="refresh-cheats" type="button">Refresh Cheat List</button>
+      </div>
+      <pre id="cheat-list">No cheats loaded.</pre>
+    </div>
     <div id="msg-layer" hidden="">
       <p id="msg-text"></p>
     </div>
     <DS4WEB-player id="player"></DS4WEB-player>
-    <script src="DS4WEB/DS4WEB.min.js"></script>
+    <script src="DS4WEB/DS4WEB.js"></script>
   </body>
   <script>
+    const exportSaveBtn = document.getElementById('export-save');
+    const speedSlider = document.getElementById('speed-slider');
+    const speedValue = document.getElementById('speed-value');
+    const useCustomTimeCheckbox = document.getElementById('use-custom-time');
+    const customTimeInput = document.getElementById('custom-time');
+    const syncTimeBtn = document.getElementById('sync-time');
+    const cheatInput = document.getElementById('cheat-input');
+    const applyCheatsBtn = document.getElementById('apply-cheats');
+    const refreshCheatsBtn = document.getElementById('refresh-cheats');
+    const cheatList = document.getElementById('cheat-list');
+    const saveStatus = document.getElementById('save-status');
+    let currentGameId = '';
+    let customEpochMs = null;
+
+    window.__dsSpeedMultiplier = 1;
+
+    function formatDateTimeLocal(date) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+    window.__dsGetEmuNowMs = function __dsGetEmuNowMs() {
+      if (useCustomTimeCheckbox.checked && Number.isFinite(customEpochMs)) {
+        return customEpochMs + (Date.now() - window.__dsCustomTimeBaseMs);
+      }
+      return Date.now();
+    };
+
+    function setCustomTimeEnabled(enabled) {
+      customTimeInput.disabled = !enabled;
+      if (!enabled) {
+        customEpochMs = null;
+        setSaveStatus('Using real system time.');
+        return;
+      }
+
+      if (!customTimeInput.value) {
+        customTimeInput.value = formatDateTimeLocal(new Date());
+      }
+
+      const parsed = Date.parse(customTimeInput.value);
+      if (Number.isFinite(parsed)) {
+        customEpochMs = parsed;
+        window.__dsCustomTimeBaseMs = Date.now();
+        setSaveStatus('Custom emulator time enabled.');
+      }
+    }
+
+    function setSaveStatus(text) {
+      saveStatus.textContent = text;
+    }
+
+    function writeCString(text) {
+      const encoded = new TextEncoder().encode(text);
+      const ptr = Module._malloc(encoded.length + 1);
+      Module.HEAPU8.set(encoded, ptr);
+      Module.HEAPU8[ptr + encoded.length] = 0;
+      return ptr;
+    }
+
+    function readCString(ptr) {
+      if (!ptr || !Module || !Module.HEAPU8 || typeof Module._utilStrLen !== 'function') {
+        return '';
+      }
+
+      const len = Module._utilStrLen(ptr);
+      if (!len) {
+        return '';
+      }
+
+      return new TextDecoder().decode(Module.HEAPU8.subarray(ptr, ptr + len));
+    }
+
+    function refreshCheatList() {
+      if (!window.Module || typeof Module._chtGetList !== 'function') {
+        cheatList.textContent = 'Cheat engine not ready yet.';
+        return;
+      }
+
+      try {
+        const listPtr = Module._chtGetList();
+        const listText = readCString(listPtr).trim();
+        cheatList.textContent = listText || 'No cheats loaded.';
+      } catch (err) {
+        console.error(err);
+        cheatList.textContent = 'Failed to read cheat list.';
+      }
+    }
+
+    function addCheatCode(line) {
+      const ptr = writeCString(line);
+      try {
+        if (typeof Module._chtAddItem !== 'function') {
+          throw new Error('Cheat API not available.');
+        }
+
+        // Some builds use 1 arg (code string), some use 2 args (code, enabled).
+        try {
+          Module._chtAddItem(ptr);
+        } catch {
+          Module._chtAddItem(ptr, 1);
+        }
+      } finally {
+        Module._free(ptr);
+      }
+    }
+
+    function deriveGameId(headerBytes, fallbackName) {
+      let id = '';
+      for (let i = 0; i < 16; i += 1) {
+        const value = headerBytes[i];
+        id += value === 0 ? ' ' : String.fromCharCode(value);
+      }
+
+      if (id[12] === '#') {
+        return fallbackName;
+      }
+
+      return id;
+    }
+
+    function toUint8Array(value) {
+      if (!value) {
+        return null;
+      }
+
+      if (value instanceof Uint8Array) {
+        return value;
+      }
+
+      if (value instanceof ArrayBuffer) {
+        return new Uint8Array(value);
+      }
+
+      if (ArrayBuffer.isView(value)) {
+        return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      }
+
+      return null;
+    }
+
+    function downloadSave(data, filename) {
+      const blob = new Blob([data], { type: 'application/binary' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      link.href = url;
+      link.download = filename;
+      link.click();
+
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+
+    async function exportSaveFile() {
+      const activeGameId = window.gameID || currentGameId;
+      if (!activeGameId) {
+        setSaveStatus('No ROM loaded yet.');
+        return;
+      }
+
+      setSaveStatus('Preparing save export...');
+
+      let saveData = null;
+
+      if (
+        window.Module &&
+        typeof Module._savGetSize === 'function' &&
+        typeof Module._savGetPointer === 'function' &&
+        Module.HEAPU8
+      ) {
+        const size = Module._savGetSize();
+        if (size > 0) {
+          const ptr = Module._savGetPointer(0);
+          saveData = new Uint8Array(size);
+          saveData.set(Module.HEAPU8.subarray(ptr, ptr + size));
+
+          if (window.localforage && typeof localforage.setItem === 'function') {
+            await localforage.setItem(`sav-${activeGameId}`, saveData);
+          }
+        }
+      }
+
+      if (!saveData && window.localforage && typeof localforage.getItem === 'function') {
+        const stored = await localforage.getItem(`sav-${activeGameId}`);
+        saveData = toUint8Array(stored);
+      }
+
+      if (!saveData || saveData.length === 0) {
+        setSaveStatus('No save data found yet.');
+        return;
+      }
+
+      downloadSave(saveData, `sav-${activeGameId}.dsv`);
+      setSaveStatus('Save exported.');
+    }
+
+    exportSaveBtn.addEventListener('click', () => {
+      exportSaveFile().catch((err) => {
+        console.error(err);
+        setSaveStatus('Save export failed.');
+      });
+    });
+
+    function updateSpeedControl(multiplier) {
+      const speed = Math.max(1, Math.min(8, multiplier));
+      window.__dsSpeedMultiplier = speed;
+      speedValue.textContent = `${speed}x`;
+    }
+
+    speedSlider.addEventListener('input', () => {
+      updateSpeedControl(Number(speedSlider.value));
+    });
+
+    useCustomTimeCheckbox.addEventListener('change', () => {
+      setCustomTimeEnabled(useCustomTimeCheckbox.checked);
+    });
+
+    customTimeInput.addEventListener('change', () => {
+      const parsed = Date.parse(customTimeInput.value);
+      if (!Number.isFinite(parsed)) {
+        setSaveStatus('Invalid custom time value.');
+        return;
+      }
+
+      customEpochMs = parsed;
+      window.__dsCustomTimeBaseMs = Date.now();
+      setSaveStatus('Custom emulator time updated.');
+    });
+
+    syncTimeBtn.addEventListener('click', () => {
+      useCustomTimeCheckbox.checked = false;
+      setCustomTimeEnabled(false);
+      customTimeInput.value = formatDateTimeLocal(new Date());
+    });
+
+    applyCheatsBtn.addEventListener('click', () => {
+      if (!window.Module) {
+        setSaveStatus('Emulator not ready for cheats yet.');
+        return;
+      }
+
+      const lines = cheatInput.value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#') && !line.startsWith('//'));
+
+      if (!lines.length) {
+        setSaveStatus('No cheat codes entered.');
+        return;
+      }
+
+      let applied = 0;
+      for (const line of lines) {
+        try {
+          addCheatCode(line);
+          applied += 1;
+        } catch (err) {
+          console.error(err);
+          setSaveStatus(`Failed while applying cheat: ${line}`);
+          refreshCheatList();
+          return;
+        }
+      }
+
+      setSaveStatus(`Applied ${applied} cheat line(s).`);
+      refreshCheatList();
+    });
+
+    refreshCheatsBtn.addEventListener('click', () => {
+      refreshCheatList();
+    });
+
     async function loadROM() {
       const res = await fetch('rom.zip');
       const buf = await res.arrayBuffer();
@@ -22,10 +312,19 @@
       if (!romFile) throw new Error('ROM not found in zip');
 
       const romBlob = await romFile.async('blob');
+      const romBytes = new Uint8Array(await romBlob.arrayBuffer());
+      currentGameId = deriveGameId(romBytes, 'platKaizo4E.nds');
+
       const url = URL.createObjectURL(romBlob);
       document.getElementById("player").loadURL(url);
+
+      setSaveStatus('ROM loaded.');
     }
     loadROM();
+    updateSpeedControl(1);
+    window.__dsCustomTimeBaseMs = Date.now();
+    customTimeInput.value = formatDateTimeLocal(new Date());
+    refreshCheatList();
 
     setTimeout(() => {
     const player = document.querySelector('DS4WEB-player');
@@ -47,4 +346,157 @@
     shadow.appendChild(style);
   }, 100);
   </script>
+  <style>
+    body {
+      margin: 0;
+      background: #1e1e1e;
+      color: #f5f5f5;
+      font-family: Verdana, sans-serif;
+    }
+
+    #toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #2d2d2d;
+      border-bottom: 1px solid #555;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    #export-save {
+      background: #d7b126;
+      color: #111;
+      border: none;
+      padding: 8px 12px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #export-save:hover {
+      background: #e8c547;
+    }
+
+    #save-status {
+      min-height: 1.2em;
+      font-size: 0.95rem;
+      color: #d7d7d7;
+    }
+
+    #speed-label {
+      font-weight: 700;
+      color: #f0f0f0;
+    }
+
+    #speed-slider {
+      width: 180px;
+      accent-color: #7ecf6a;
+      cursor: pointer;
+    }
+
+    #time-toggle-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      color: #f0f0f0;
+    }
+
+    #custom-time {
+      background: #191919;
+      color: #f5f5f5;
+      border: 1px solid #5a5a5a;
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+
+    #sync-time {
+      background: #4e6f9a;
+      color: #fff;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #sync-time:hover {
+      background: #5e84b5;
+    }
+
+    #cheat-panel {
+      margin: 12px;
+      padding: 10px;
+      border: 1px solid #555;
+      border-radius: 8px;
+      background: #262626;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #cheat-label {
+      font-weight: 700;
+      color: #f0f0f0;
+    }
+
+    #cheat-input {
+      width: 100%;
+      max-width: 760px;
+      background: #141414;
+      color: #f5f5f5;
+      border: 1px solid #5a5a5a;
+      border-radius: 6px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      resize: vertical;
+    }
+
+    #cheat-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    #apply-cheats,
+    #refresh-cheats {
+      background: #2f7a4a;
+      color: #fff;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #refresh-cheats {
+      background: #4a5d7a;
+    }
+
+    #apply-cheats:hover {
+      background: #3b8f5a;
+    }
+
+    #refresh-cheats:hover {
+      background: #5a7092;
+    }
+
+    #cheat-list {
+      margin: 0;
+      max-width: 760px;
+      min-height: 44px;
+      max-height: 200px;
+      overflow: auto;
+      background: #101010;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px;
+      color: #d9e5d8;
+      font-family: Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
 </html>

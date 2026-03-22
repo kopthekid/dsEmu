@@ -1729,10 +1729,14 @@ if (player) {
     var prevRunFrameTime = performance.now();
     function emuLoop() {
         if (window.requestAnimationFrame(emuLoop), emuIsRunning) {
-            if (config.powerSave && performance.now() - prevRunFrameTime < 32) {
+            var speedMultiplier = Math.max(1, Math.floor(window.__dsSpeedMultiplier || 1));
+            if (config.powerSave && 1 === speedMultiplier && performance.now() - prevRunFrameTime < 32) {
                 return;
             };
-            prevRunFrameTime = performance.now(), emuRunFrame();
+            prevRunFrameTime = performance.now();
+            for (var i = 0; i < speedMultiplier; i++) {
+                emuRunFrame();
+            };
         };
     };
     emuLoop();
@@ -4467,7 +4471,8 @@ function _strftime_l(e, t, r, n) {
     return _strftime(e, t, r, n);
 };
 function _time(e) {
-    var t = Date.now() / 1e3 | 0;
+    var nowMs = "function" == typeof window.__dsGetEmuNowMs ? window.__dsGetEmuNowMs() : Date.now();
+    var t = nowMs / 1e3 | 0;
     return e && (HEAP32[e >> 2] = t), t;
 };
 Module.__MONTH_DAYS_REGULAR = __MONTH_DAYS_REGULAR, Module.__addDays = __addDays, Module._strftime = _strftime, Module._strftime_l = _strftime_l, Module._time = _time;
