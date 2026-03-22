@@ -21,6 +21,7 @@
       <label for="cheat-input" id="cheat-label">Cheat Codes (one line each)</label>
       <textarea id="cheat-input" rows="4" placeholder="Example:\n94000130 FCFF0000\nB2101D40 00000000\n00000092 00000063"></textarea>
       <div id="cheat-actions">
+        <button id="import-save-alt" type="button">Import Save File</button>
         <button id="apply-cheats" type="button">Apply Cheats</button>
         <button id="refresh-cheats" type="button">Refresh Cheat List</button>
       </div>
@@ -35,6 +36,7 @@
   <script>
     const exportSaveBtn = document.getElementById('export-save');
     const importSaveBtn = document.getElementById('import-save');
+    const importSaveAltBtn = document.getElementById('import-save-alt');
     const importSaveFileInput = document.getElementById('import-save-file');
     const speedSlider = document.getElementById('speed-slider');
     const speedInput = document.getElementById('speed-input');
@@ -277,6 +279,10 @@
     });
 
     importSaveBtn.addEventListener('click', () => {
+      importSaveFileInput.click();
+    });
+
+    importSaveAltBtn.addEventListener('click', () => {
       importSaveFileInput.click();
     });
 
@@ -564,6 +570,7 @@
     }
 
     #apply-cheats,
+    #import-save-alt,
     #refresh-cheats {
       background: #2f7a4a;
       color: #fff;
@@ -577,12 +584,21 @@
       background: #4a5d7a;
     }
 
+    #import-save-alt {
+      background: #7e9f3f;
+      color: #111;
+    }
+
     #apply-cheats:hover {
       background: #3b8f5a;
     }
 
     #refresh-cheats:hover {
       background: #5a7092;
+    }
+
+    #import-save-alt:hover {
+      background: #93ba49;
     }
 
     #cheat-list {

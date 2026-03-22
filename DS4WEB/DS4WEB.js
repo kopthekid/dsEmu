@@ -1650,12 +1650,13 @@ if (player) {
             document.getElementById("msg-layer").hidden = !0;
         }, 1e3);
     };
-    function emuRunFrame() {
+    function emuRunFrame(renderFrame) {
+        void 0 === renderFrame && (renderFrame = !0);
         processGamepadInput();
         for (var e = 0, t = 0; t < 14; t++) {
             emuKeyState[t] && (e |= 1 << t);
         };
-        if (emuKeyState[11] && (console.log("mic"), e |= 16384), config.powerSave && Module._runFrame(0, e, touched, touchX, touchY), Module._runFrame(1, e, touched, touchX, touchY), ctx2d[0].putImageData(FB[0], 0, 0), ctx2d[1].putImageData(FB[1], 0, 0), audioWorkletNode) {
+        if (emuKeyState[11] && (console.log("mic"), e |= 16384), config.powerSave && Module._runFrame(0, e, touched, touchX, touchY), Module._runFrame(1, e, touched, touchX, touchY), renderFrame && (ctx2d[0].putImageData(FB[0], 0, 0), ctx2d[1].putImageData(FB[1], 0, 0)), renderFrame && audioWorkletNode) {
             try {
                 var r = Module._fillAudioBuffer(4096);
                 tmpAudioBuffer.set(audioBuffer.subarray(0, 2 * r)), audioWorkletNode.port.postMessage(tmpAudioBuffer.subarray(0, 2 * r));
@@ -1741,9 +1742,10 @@ if (player) {
             speedFrameDebt = Math.min(12, speedFrameDebt + speedMultiplier);
             var framesToRun = Math.max(1, Math.floor(speedFrameDebt));
             speedFrameDebt -= framesToRun;
+            var isSpeedup = speedMultiplier > 1;
 
             for (var i = 0; i < framesToRun; i++) {
-                emuRunFrame();
+                emuRunFrame(!isSpeedup || i === framesToRun - 1);
             };
         };
     };
