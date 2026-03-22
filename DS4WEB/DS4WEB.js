@@ -1567,7 +1567,7 @@ if (player) {
     var config = {
         swapTopBottom: !1,
         swapTopBottomL: !1,
-        powerSave: !0,
+        powerSave: !1,
         micWhenR: !0,
         vkEnabled: !0
     };
@@ -1694,9 +1694,9 @@ if (player) {
             for (var r = 0; r < 16; r++) {
                 gameID += 0 == t[r] ? " " : String.fromCharCode(t[r]);
             };
-            "#" == gameID[12] && (gameID = e.name), console.log("gameID", gameID), romSize = e.size;
+            "#" == gameID[12] && (gameID = e.name), romSize = e.size;
             var n = Module._prepareRomBuffer(romSize);
-            console.log(romSize, n), Module.HEAPU8.set(new Uint8Array(await e.arrayBuffer()), n);
+            Module.HEAPU8.set(new Uint8Array(await e.arrayBuffer()), n);
             var o = await localforage.getItem("sav-" + gameID);
             if (o && Module.HEAPU8.set(o, Module._savGetPointer(o.length)), Module._savUpdateChangeFlag(), 1 == Module._loadROM(romSize)) {
                 ptrFrontBuffer = Module._getSymbol(5);
@@ -1705,7 +1705,7 @@ if (player) {
                     FB[r] = new ImageData(new Uint8ClampedArray(Module.HEAPU8.buffer).subarray(a + 256 * 192 * 4 * r, a + 256 * 192 * 4 * (r + 1)), 256, 192)
                 };
                 var i = Module._getSymbol(6);
-                audioBuffer = new Int16Array(Module.HEAPU8.buffer).subarray(i / 2, i / 2 + 16384 * 2), console.log("Start!!!"), emuIsGameLoaded = !0, emuIsRunning = !0, shadow.querySelector("#player").hidden = !1, callPlugin("loaded", gameID);
+                audioBuffer = new Int16Array(Module.HEAPU8.buffer).subarray(i / 2, i / 2 + 16384 * 2), emuIsGameLoaded = !0, emuIsRunning = !0, shadow.querySelector("#player").hidden = !1, callPlugin("loaded", gameID);
             } else {
                 alert("LoadROM failed.");
             };
@@ -1737,7 +1737,9 @@ if (player) {
             var speedMultiplier = Number(window.__dsSpeedMultiplier || 1);
             speedMultiplier = isFinite(speedMultiplier) ? speedMultiplier : 1;
             speedMultiplier = Math.max(1, Math.min(4, speedMultiplier));
-            if (config.powerSave && speedMultiplier <= 1 && performance.now() - prevRunFrameTime < 32) {
+            var targetFrameMs = Number(window.__dsFrameIntervalMs || 16.67);
+            targetFrameMs = isFinite(targetFrameMs) ? Math.max(8, targetFrameMs) : 16.67;
+            if (config.powerSave && speedMultiplier <= 1 && performance.now() - prevRunFrameTime < targetFrameMs) {
                 return;
             };
 
@@ -1748,7 +1750,8 @@ if (player) {
             var isSpeedup = speedMultiplier > 1;
             processGamepadInput();
             var keyMask = buildKeyMask();
-            var turboBudgetMs = isSpeedup ? 10 : 14;
+            var turboBudgetMs = Number(window.__dsTurboBudgetMs || 12);
+            turboBudgetMs = isFinite(turboBudgetMs) ? Math.max(6, turboBudgetMs) : 12;
             var turboStart = performance.now();
 
             for (var i = 0; i < framesToRun; i++) {
@@ -1843,7 +1846,9 @@ if (player) {
         };
         return -1;
     } ["touchstart", "touchmove", "touchend", "touchcancel", "touchenter", "touchleave"].forEach(e => {
-        window.addEventListener(e, handleTouch);
+        window.addEventListener(e, handleTouch, {
+            passive: !1
+        });
     }), window.onmousedown = window.onmouseup = window.onmousemove = (e => {
         if (emuIsRunning) {
             if (isLauncherUIInteractionEvent(e)) {

@@ -53,6 +53,8 @@
     let customEpochMs = null;
 
     window.__dsSpeedMultiplier = 1;
+    window.__dsFrameIntervalMs = 16.67;
+    window.__dsTurboBudgetMs = 12;
 
     function formatDateTimeLocal(date) {
       const pad = (n) => String(n).padStart(2, '0');
