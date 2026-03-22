@@ -1748,8 +1748,23 @@ if (player) {
     function clamp01(e) {
         return e < 0 ? 0 : e > 1 ? 1 : e;
     };
+    function isLauncherUIEventTarget(target) {
+        if (!target || "function" != typeof target.closest) {
+            return !1;
+        };
+
+        if (target.closest("#toolbar") || target.closest("#cheat-panel")) {
+            return !0;
+        };
+
+        var tag = target.tagName;
+        return "INPUT" === tag || "TEXTAREA" === tag || "BUTTON" === tag || "SELECT" === tag || "OPTION" === tag || "LABEL" === tag;
+    };
     function handleTouch(t) {
         if (tryInitSound(), emuIsRunning) {
+            if (isLauncherUIEventTarget(t.target)) {
+                return;
+            };
             t.preventDefault(), t.stopPropagation();
             for (var r = !1, n = 0, o = 0, a = !1, i = vkStickPos[0], u = vkStickPos[1], s = vkStickPos[2], l = vkStickPos[3], c = .4 * s, d = null, f = null, m = screenCanvas[1].getBoundingClientRect(), p = 0; p < emuKeyState.length; p++) {
                 emuKeyState[p] = !1;
@@ -1793,6 +1808,9 @@ if (player) {
         window.addEventListener(e, handleTouch);
     }), window.onmousedown = window.onmouseup = window.onmousemove = (e => {
         if (emuIsRunning) {
+            if (isLauncherUIEventTarget(e.target)) {
+                return;
+            };
             "mousedown" == e.type && tryInitSound();
             var t = screenCanvas[1].getBoundingClientRect();
             e.preventDefault(), e.stopPropagation();
