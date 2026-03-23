@@ -1864,6 +1864,9 @@ if (player) {
         };
     }), window.onkeydown = window.onkeyup = (e => {
         if (emuIsRunning) {
+            if (isLauncherUIInteractionEvent(e)) {
+                return;
+            };
             e.preventDefault();
             var t = "keydown" === e.type;
             var r = convertKeyCode(e.keyCode);
