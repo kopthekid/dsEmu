@@ -7,12 +7,14 @@
   </head>
   <body>
     <div id="toolbar">
-      <button id="export-save" type="button">Export Save (.dsv)</button>
-      <button id="import-save" type="button">Import Save</button>
+      <button id="export-save" type="button">Export Save (.sav)</button>
+      <button id="import-save" type="button">Import Save (.sav/.dsv)</button>
       <input id="import-save-file" type="file" accept=".dsv,.sav,application/octet-stream" hidden>
       <label for="speed-slider" id="speed-label">Speed: <span id="speed-value">1x</span></label>
       <input id="speed-slider" type="range" min="1" max="4" step="0.1" value="1">
       <input id="speed-input" type="number" min="1" max="4" step="0.1" value="1" aria-label="Speed multiplier">
+      <label for="frame-skip" id="frame-skip-label">Frame Skip: <span id="frame-skip-value">0</span></label>
+      <input id="frame-skip" type="range" min="0" max="8" step="1" value="0">
       <label id="time-toggle-wrap"><input id="use-custom-time" type="checkbox"> Custom Time</label>
       <input id="custom-time" type="datetime-local" step="1" disabled>
       <button id="sync-time" type="button">Use Current Time</button>
@@ -22,7 +24,7 @@
       <label for="cheat-input" id="cheat-label">Cheat Codes (one line each)</label>
       <textarea id="cheat-input" rows="4" placeholder="Example:\n94000130 FCFF0000\nB2101D40 00000000\n00000092 00000063"></textarea>
       <div id="cheat-actions">
-        <button id="import-save-alt" type="button">Import Save File</button>
+        <button id="import-save-alt" type="button">Import .sav/.dsv File</button>
         <button id="apply-cheats" type="button">Apply Cheats</button>
         <button id="refresh-cheats" type="button">Refresh Cheat List</button>
       </div>
@@ -42,6 +44,8 @@
     const speedSlider = document.getElementById('speed-slider');
     const speedInput = document.getElementById('speed-input');
     const speedValue = document.getElementById('speed-value');
+    const frameSkipSlider = document.getElementById('frame-skip');
+    const frameSkipValue = document.getElementById('frame-skip-value');
     const useCustomTimeCheckbox = document.getElementById('use-custom-time');
     const customTimeInput = document.getElementById('custom-time');
     const syncTimeBtn = document.getElementById('sync-time');
@@ -56,6 +60,7 @@
     window.__dsSpeedMultiplier = 1;
     window.__dsFrameIntervalMs = 16.67;
     window.__dsTurboBudgetMs = 12;
+    window.__dsFrameSkip = 0;
 
     function formatDateTimeLocal(date) {
       const pad = (n) => String(n).padStart(2, '0');
@@ -247,14 +252,14 @@
         return;
       }
 
-      downloadSave(saveData, `sav-${activeGameId}.dsv`);
-      setSaveStatus('Save exported.');
+      downloadSave(saveData, `sav-${activeGameId}.sav`);
+      setSaveStatus('Save exported as .sav.');
     }
 
     async function importSaveFile(file) {
       const activeGameId = window.gameID || currentGameId;
       if (!activeGameId) {
-        setSaveStatus('Load ROM first, then import save.');
+        setSaveStatus('Load ROM first, then import a .sav or .dsv file.');
         return;
       }
 
@@ -333,6 +338,23 @@
       speedValue.textContent = Number.isInteger(speed) ? `${speed}x` : `${speed.toFixed(1)}x`;
     }
 
+    function normalizeFrameSkip(value) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return 0;
+      }
+
+      return Math.max(0, Math.min(8, Math.round(parsed)));
+    }
+
+    function updateFrameSkipControl(value) {
+      const skip = normalizeFrameSkip(value);
+      window.__dsFrameSkip = skip;
+      frameSkipSlider.value = String(skip);
+      frameSkipValue.textContent = String(skip);
+      setSaveStatus(skip === 0 ? 'Frame skip disabled.' : `Skipping ${skip} frame(s) between renders.`);
+    }
+
     speedSlider.addEventListener('input', () => {
       updateSpeedControl(Number(speedSlider.value));
     });
@@ -343,6 +365,10 @@
 
     speedInput.addEventListener('blur', () => {
       updateSpeedControl(speedInput.value);
+    });
+
+    frameSkipSlider.addEventListener('input', () => {
+      updateFrameSkipControl(frameSkipSlider.value);
     });
 
     useCustomTimeCheckbox.addEventListener('change', () => {
@@ -440,6 +466,7 @@
     }
     loadROM();
     updateSpeedControl(1);
+    updateFrameSkipControl(0);
     window.__dsCustomTimeBaseMs = Date.now();
     customTimeInput.value = formatDateTimeLocal(new Date());
     refreshCheatList();
@@ -524,9 +551,20 @@
       color: #f0f0f0;
     }
 
+    #frame-skip-label {
+      font-weight: 700;
+      color: #f0f0f0;
+    }
+
     #speed-slider {
       width: 180px;
       accent-color: #7ecf6a;
+      cursor: pointer;
+    }
+
+    #frame-skip {
+      width: 140px;
+      accent-color: #d7b126;
       cursor: pointer;
     }
 

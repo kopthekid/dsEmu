@@ -1732,11 +1732,14 @@ if (player) {
     };
     var prevRunFrameTime = performance.now();
     var speedFrameDebt = 0;
+    var renderFrameDebt = 0;
     function emuLoop() {
         if (window.requestAnimationFrame(emuLoop), emuIsRunning) {
             var speedMultiplier = Number(window.__dsSpeedMultiplier || 1);
             speedMultiplier = isFinite(speedMultiplier) ? speedMultiplier : 1;
             speedMultiplier = Math.max(1, Math.min(4, speedMultiplier));
+            var frameSkipCount = Number(window.__dsFrameSkip || 0);
+            frameSkipCount = isFinite(frameSkipCount) ? Math.max(0, Math.min(8, Math.round(frameSkipCount))) : 0;
             var targetFrameMs = Number(window.__dsFrameIntervalMs || 16.67);
             targetFrameMs = isFinite(targetFrameMs) ? Math.max(8, targetFrameMs) : 16.67;
             if (config.powerSave && speedMultiplier <= 1 && performance.now() - prevRunFrameTime < targetFrameMs) {
@@ -1758,7 +1761,17 @@ if (player) {
                 if (i > 0 && performance.now() - turboStart > turboBudgetMs) {
                     break;
                 };
-                emuRunFrame(keyMask, !isSpeedup || i === framesToRun - 1);
+                var shouldRenderFrame = !isSpeedup || i === framesToRun - 1;
+                if (shouldRenderFrame && frameSkipCount > 0) {
+                    renderFrameDebt += 1;
+                    shouldRenderFrame = renderFrameDebt > frameSkipCount;
+                    if (shouldRenderFrame) {
+                        renderFrameDebt = 0;
+                    };
+                } else if (shouldRenderFrame) {
+                    renderFrameDebt = 0;
+                };
+                emuRunFrame(keyMask, shouldRenderFrame);
             };
         };
     };
