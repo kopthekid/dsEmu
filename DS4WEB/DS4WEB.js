@@ -1632,13 +1632,21 @@ if (player) {
     var romSize = 0;
     var FB = [0, 0];
     var screenCanvas = [shadow.getElementById("top"), shadow.getElementById("bottom")];
-    var ctx2d = screenCanvas.map(e => e.getContext("2d", { alpha: !1 }));
+    var ctx2d = screenCanvas.map(e => {
+        var t = e.getContext("2d", {
+            alpha: !1,
+            desynchronized: !0
+        });
+        return t && (t.imageSmoothingEnabled = !1), t;
+    });
     var tmpAudioBuffer = new Int16Array(32768);
     var frameCount = 0;
     var touched = 0;
     var touchX = 0;
     var touchY = 0;
     var prevSaveFlag = 0;
+    var pendingAutosaveBuffer = null;
+    var pendingAutosaveScheduled = !1;
     var lastTwoFrameTime = 10;
     function callPlugin(e, t) {
         for (var r in plugins) {
@@ -1650,6 +1658,79 @@ if (player) {
             document.getElementById("msg-layer").hidden = !0;
         }, 1e3);
     };
+    function getRenderMode() {
+        return "full" === window.__dsRenderMode ? "full" : "light";
+    };
+    function getAudioMode() {
+        return "off" === window.__dsAudioMode ? "off" : "full" === window.__dsAudioMode ? "full" : "light";
+    };
+    function getAudioSampleRate() {
+        return "light" === getAudioMode() ? 32000 : 47860;
+    };
+    function getAudioBufferRequestSize() {
+        return "light" === getAudioMode() ? 2048 : 4096;
+    };
+    function getAutosaveMode() {
+        return "manual" === window.__dsAutosaveMode ? "manual" : "normal" === window.__dsAutosaveMode ? "normal" : "light";
+    };
+    function getAutosaveCheckInterval() {
+        var e = getAutosaveMode();
+        return "manual" === e ? 0 : "normal" === e ? 30 : 180;
+    };
+    function queueAutosaveWrite(e) {
+        pendingAutosaveBuffer = e;
+        if (pendingAutosaveScheduled) {
+            return;
+        };
+        pendingAutosaveScheduled = !0;
+        var t = function () {
+            if (pendingAutosaveScheduled = !1, !pendingAutosaveBuffer) {
+                return;
+            };
+            var e = pendingAutosaveBuffer;
+            pendingAutosaveBuffer = null, localforage.setItem("sav-" + gameID, e).then(() => {
+                showMsg("Auto saving...");
+            }).catch(e => {
+                console.log(e);
+            });
+        };
+        window.requestIdleCallback ? window.requestIdleCallback(t, {
+            timeout: 1e3
+        }) : setTimeout(t, 250);
+    };
+    function applyAudioSettings() {
+        var e = getAudioMode();
+        var t = getAudioSampleRate();
+        try {
+            Module && "function" == typeof Module._setSampleRate && Module._setSampleRate(t);
+        } catch (e) {
+            console.log(e);
+        };
+        if ("off" === e) {
+            if (audioWorkletNode) {
+                try {
+                    audioWorkletNode.disconnect();
+                } catch (e) {};
+            };
+            if (audioContext) {
+                try {
+                    audioContext.close();
+                } catch (e) {};
+            };
+            audioWorkletNode = null, audioContext = null;
+            return;
+        };
+        if (audioContext && Math.abs(audioContext.sampleRate - t) > 512) {
+            try {
+                audioContext.close();
+            } catch (e) {};
+            audioWorkletNode = null, audioContext = null;
+        };
+        audioContext && "running" != audioContext.state && audioContext.resume().catch(e => {
+            console.log(e);
+        });
+    };
+    window.__dsApplyAudioSettings = applyAudioSettings;
     function buildKeyMask() {
         for (var e = 0, t = 0; t < 14; t++) {
             emuKeyState[t] && (e |= 1 << t);
@@ -1659,21 +1740,29 @@ if (player) {
     };
     function emuRunFrame(keyMask, renderFrame) {
         void 0 === renderFrame && (renderFrame = !0);
-        if (config.powerSave && Module._runFrame(0, keyMask, touched, touchX, touchY), Module._runFrame(1, keyMask, touched, touchX, touchY), renderFrame && (ctx2d[0].putImageData(FB[0], 0, 0), ctx2d[1].putImageData(FB[1], 0, 0)), renderFrame && audioWorkletNode) {
+        var shouldBlitFrame = renderFrame;
+        var renderStride = "full" === getRenderMode() ? 1 : 2;
+        if (shouldBlitFrame && renderStride > 1) {
+            videoRenderDebt += 1, shouldBlitFrame = videoRenderDebt >= renderStride, shouldBlitFrame && (videoRenderDebt = 0);
+        } else {
+            videoRenderDebt = 0;
+        };
+        if (config.powerSave && Module._runFrame(0, keyMask, touched, touchX, touchY), Module._runFrame(1, keyMask, touched, touchX, touchY), shouldBlitFrame && (ctx2d[0].putImageData(FB[0], 0, 0), ctx2d[1].putImageData(FB[1], 0, 0)), renderFrame && audioWorkletNode && "off" !== getAudioMode()) {
             try {
-                var r = Module._fillAudioBuffer(4096);
+                var r = Module._fillAudioBuffer(getAudioBufferRequestSize());
                 tmpAudioBuffer.set(audioBuffer.subarray(0, 2 * r)), audioWorkletNode.port.postMessage(tmpAudioBuffer.subarray(0, 2 * r));
             } catch (e) {
                 console.log(e);
             };
         };
         frameCount += 1;
-        if (frameCount % 30 == 0) {
+        var autosaveCheckInterval = getAutosaveCheckInterval();
+        if (autosaveCheckInterval > 0 && frameCount % autosaveCheckInterval == 0) {
             checkSaveGame();
         };
     };
     function wasmReady() {
-        Module._setSampleRate(47860);
+        applyAudioSettings();
     };
     function checkSaveGame() {
         var e = Module._savUpdateChangeFlag();
@@ -1682,7 +1771,7 @@ if (player) {
             if (t > 0 && isSaveSupported) {
                 var r = Module._savGetPointer(0);
                 var n = new Uint8Array(t);
-                n.set(Module.HEAPU8.subarray(r, r + t)), localforage.setItem("sav-" + gameID, n), showMsg("Auto saving...");
+                n.set(Module.HEAPU8.subarray(r, r + t)), queueAutosaveWrite(n);
             };
         };
         prevSaveFlag = e;
@@ -1713,13 +1802,17 @@ if (player) {
     };
     function tryInitSound() {
         try {
+            if ("off" === getAudioMode()) {
+                return;
+            };
             if (audioContext) {
                 return void ("running" != audioContext.state && audioContext.resume());
             };
+            var audioMode = getAudioMode();
             (audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                latencyHint: 1e-4,
-                sampleRate: 48e3
-            })).audioWorklet ? audioContext.audioWorklet.addModule(URL.createObjectURL(new Blob(["class MyAudioWorklet extends AudioWorkletProcessor {\n    constructor() {\n        super()\n        this.FIFO_CAP = 5000\n        this.fifo0 = new Int16Array(this.FIFO_CAP)\n        this.fifo1 = new Int16Array(this.FIFO_CAP)\n        this.fifoHead = 0\n        this.fifoLen = 0\n        this.port.onmessage = (e) => {\n            //console.log(this.fifoLen)\n            var buf = e.data\n            var samplesReceived = buf.length / 2\n            if (this.fifoLen + samplesReceived >= this.FIFO_CAP) {\n                console.log('o')\n                return\n            }\n\n            for (var i = 0; i < buf.length; i+=2) {\n                this.fifoEnqueue(buf[i], buf[i+1])\n            }\n        }\n    }\n\n    fifoDequeue() {\n        this.fifoHead += 1\n        this.fifoHead %= this.FIFO_CAP\n        this.fifoLen -= 1\n    }\n\n    fifoEnqueue(a, b) {\n        const pos = (this.fifoHead + this.fifoLen) % this.FIFO_CAP\n        this.fifo0[pos] = a\n        this.fifo1[pos] = b\n        this.fifoLen += 1\n    }\n\n    process(inputs, outputs, parameters) {\n        const output = outputs[0]\n        const chan0 = output[0]\n        const chan1 = output[1]\n\n        for (var i = 0; i < chan0.length; i++) {\n            if (this.fifoLen < 1) {\n                console.log(\"u\")\n                break\n            }\n            chan0[i] = this.fifo0[this.fifoHead] / 32768.0\n            chan1[i] = this.fifo1[this.fifoHead] / 32768.0\n            this.fifoDequeue()\n        }\n        return true\n    }\n}\n\nregisterProcessor('my-worklet', MyAudioWorklet)"], {
+                latencyHint: "light" === audioMode ? "playback" : 1e-4,
+                sampleRate: getAudioSampleRate()
+            })).audioWorklet ? audioContext.audioWorklet.addModule(URL.createObjectURL(new Blob(["class MyAudioWorklet extends AudioWorkletProcessor {\n    constructor() {\n        super()\n        this.FIFO_CAP = 5000\n        this.fifo0 = new Int16Array(this.FIFO_CAP)\n        this.fifo1 = new Int16Array(this.FIFO_CAP)\n        this.fifoHead = 0\n        this.fifoLen = 0\n        this.port.onmessage = (e) => {\n            var buf = e.data\n            var samplesReceived = buf.length / 2\n            if (this.fifoLen + samplesReceived >= this.FIFO_CAP) {\n                return\n            }\n\n            for (var i = 0; i < buf.length; i+=2) {\n                this.fifoEnqueue(buf[i], buf[i+1])\n            }\n        }\n    }\n\n    fifoDequeue() {\n        this.fifoHead += 1\n        this.fifoHead %= this.FIFO_CAP\n        this.fifoLen -= 1\n    }\n\n    fifoEnqueue(a, b) {\n        const pos = (this.fifoHead + this.fifoLen) % this.FIFO_CAP\n        this.fifo0[pos] = a\n        this.fifo1[pos] = b\n        this.fifoLen += 1\n    }\n\n    process(inputs, outputs, parameters) {\n        const output = outputs[0]\n        const chan0 = output[0]\n        const chan1 = output[1]\n\n        for (var i = 0; i < chan0.length; i++) {\n            if (this.fifoLen < 1) {\n                break\n            }\n            chan0[i] = this.fifo0[this.fifoHead] / 32768.0\n            chan1[i] = this.fifo1[this.fifoHead] / 32768.0\n            this.fifoDequeue()\n        }\n        return true\n    }\n}\n\nregisterProcessor('my-worklet', MyAudioWorklet)"], {
                 type: "text/javascript"
             }))).then(() => {
                 (audioWorkletNode = new AudioWorkletNode(audioContext, "my-worklet", {
@@ -1733,6 +1826,7 @@ if (player) {
     var prevRunFrameTime = performance.now();
     var speedFrameDebt = 0;
     var renderFrameDebt = 0;
+    var videoRenderDebt = 0;
     function emuLoop() {
         if (window.requestAnimationFrame(emuLoop), emuIsRunning) {
             var speedMultiplier = Number(window.__dsSpeedMultiplier || 1);
