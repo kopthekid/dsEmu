@@ -1922,13 +1922,47 @@ if (player) {
 
         return isLauncherUIEventTarget(document.activeElement);
     };
+    function isVirtualControlTarget(target) {
+        return !!(target && "function" == typeof target.closest && target.closest("[data-k]"));
+    };
+    function isScreenCanvasTarget(target) {
+        for (var e = 0; e < screenCanvas.length; e++) {
+            if (target === screenCanvas[e]) {
+                return !0;
+            };
+        };
+        return !1;
+    };
+    function isEmulatorTouchEvent(event) {
+        if (!event) {
+            return !1;
+        };
+
+        if (isScreenCanvasTarget(event.target) || isVirtualControlTarget(event.target)) {
+            return !0;
+        };
+
+        if ("function" == typeof event.composedPath) {
+            var e = event.composedPath();
+            for (var t = 0; t < e.length; t++) {
+                if (isScreenCanvasTarget(e[t]) || isVirtualControlTarget(e[t])) {
+                    return !0;
+                };
+            };
+        };
+
+        return !1;
+    };
     function handleTouch(t) {
         if (tryInitSound(), emuIsRunning) {
             if (isLauncherUIInteractionEvent(t)) {
                 return;
             };
-            t.preventDefault(), t.stopPropagation();
             syncVirtualControls();
+            if (!isEmulatorTouchEvent(t)) {
+                return;
+            };
+            t.preventDefault(), t.stopPropagation();
             var hasVirtualStick = !!(vkStickPos && vkMap.stick);
             for (var r = !1, n = 0, o = 0, a = !1, i = hasVirtualStick ? vkStickPos[0] : 0, u = hasVirtualStick ? vkStickPos[1] : 0, s = hasVirtualStick ? vkStickPos[2] : 0, l = hasVirtualStick ? vkStickPos[3] : 0, c = .4 * s, d = null, f = null, m = screenCanvas[1].getBoundingClientRect(), p = 0; p < emuKeyState.length; p++) {
                 emuKeyState[p] = !1;

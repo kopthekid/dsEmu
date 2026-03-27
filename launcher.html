@@ -611,11 +611,17 @@
       @media (max-width: 720px) {
         #player {
           gap: 6px;
-          padding: 10px 0 14px;
+          padding: 8px 0 10px;
         }
         #top, #bottom {
-          width: min(calc(100vw - 16px), calc(38vh * (256 / 192)));
-          max-height: 38vh;
+          width: min(calc(100vw - 16px), calc(28dvh * (256 / 192)));
+          max-height: 28dvh;
+        }
+      }
+      @media (max-width: 520px) {
+        #top, #bottom {
+          width: min(calc(100vw - 12px), calc(24dvh * (256 / 192)));
+          max-height: 24dvh;
         }
       }
     `;
@@ -1038,10 +1044,11 @@
       }
 
       DS4WEB-player {
-        padding: 0 8px 12px;
+        padding: 0 6px 8px;
       }
 
       #toolbar {
+        position: static;
         gap: 8px;
         padding-right: 10px;
         padding-bottom: 10px;
@@ -1092,22 +1099,43 @@
 
     @media (max-width: 520px) {
       #mobile-controls {
-        margin: 0 8px 12px;
-        padding: 10px;
-        gap: 10px;
+        margin: 0 6px 10px;
+        padding: 8px;
+        gap: 8px;
       }
 
       .mobile-controls-row {
-        gap: 10px;
+        gap: 8px;
       }
 
       .mobile-wide {
-        min-width: 60px;
-        padding: 0 12px;
+        min-width: 52px;
+        min-height: 42px;
+        padding: 0 10px;
       }
 
       .mobile-pill {
-        min-width: 76px;
+        min-width: 68px;
+        min-height: 40px;
+      }
+
+      .mobile-control {
+        min-width: 44px;
+        min-height: 44px;
+        border-radius: 14px;
+      }
+
+      .mobile-dpad,
+      .mobile-actions {
+        width: min(34vw, 140px);
+        height: min(34vw, 140px);
+      }
+
+      .mobile-dpad .mobile-control,
+      .mobile-actions .mobile-control {
+        width: min(18vw, 60px);
+        height: min(18vw, 60px);
+        border-radius: 18px;
       }
     }
   </style>
