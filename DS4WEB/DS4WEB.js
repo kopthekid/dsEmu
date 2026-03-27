@@ -1632,6 +1632,13 @@ if (player) {
     var romSize = 0;
     var FB = [0, 0];
     var screenCanvas = [shadow.getElementById("top"), shadow.getElementById("bottom")];
+    screenCanvas.forEach(e => {
+        e.style.touchAction = "none";
+        e.style.msTouchAction = "none";
+        e.style.imageRendering = "pixelated";
+        e.style.userSelect = "none";
+        e.style.webkitUserSelect = "none";
+    });
     var ctx2d = screenCanvas.map(e => {
         var t = e.getContext("2d", {
             alpha: !1,

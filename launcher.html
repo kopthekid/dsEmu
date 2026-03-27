@@ -2,6 +2,7 @@
 <html data-blank-button>
   <head>
     <title>WebDS Emulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <script defer src="blank-session.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   </head>
@@ -561,7 +562,10 @@
 
     setTimeout(() => {
     const player = document.querySelector('DS4WEB-player');
-    const shadow = player.shadowRoot;
+    const shadow = player && player.shadowRoot;
+    if (!shadow) {
+      return;
+    }
 
     const style = document.createElement('style');
     style.textContent = `
@@ -570,21 +574,80 @@
         flex-direction: column;
         align-items: center;
         gap: 8px;
+        padding: 12px 0 16px;
+        box-sizing: border-box;
       }
       #top, #bottom {
-        height: 40vh;
-        width: calc(40vh * (256 / 192));
+        width: min(calc(100vw - 24px), calc(42vh * (256 / 192)));
+        height: auto;
+        max-height: 42vh;
+        touch-action: none;
+        image-rendering: pixelated;
+      }
+      @media (max-width: 720px) {
+        #player {
+          gap: 6px;
+          padding: 10px 0 14px;
+        }
+        #top, #bottom {
+          width: min(calc(100vw - 16px), calc(38vh * (256 / 192)));
+          max-height: 38vh;
+        }
       }
     `;
     shadow.appendChild(style);
   }, 100);
   </script>
   <style>
+    html {
+      background: #1e1e1e;
+      overscroll-behavior: none;
+    }
+
     body {
       margin: 0;
+      min-height: 100vh;
       background: #1e1e1e;
       color: #f5f5f5;
       font-family: Verdana, sans-serif;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    select,
+    input[type="number"],
+    input[type="datetime-local"],
+    textarea {
+      font-size: 16px;
+    }
+
+    input[type="range"] {
+      touch-action: pan-x;
+    }
+
+    DS4WEB-player {
+      display: block;
+      width: 100%;
+      padding: 0 12px 16px;
+    }
+
+    canvas {
+      touch-action: none;
     }
 
     #toolbar {
@@ -598,6 +661,7 @@
       position: sticky;
       top: 0;
       z-index: 20;
+      padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
     }
 
     #export-save {
@@ -632,16 +696,23 @@
       min-height: 1.2em;
       font-size: 0.95rem;
       color: #d7d7d7;
+      flex-basis: 100%;
     }
 
     #speed-label {
       font-weight: 700;
       color: #f0f0f0;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
     }
 
     #frame-skip-label {
       font-weight: 700;
       color: #f0f0f0;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
     }
 
     #render-mode-label,
@@ -649,6 +720,9 @@
     #autosave-mode-label {
       font-weight: 700;
       color: #f0f0f0;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
     }
 
     #speed-slider {
@@ -702,6 +776,7 @@
       gap: 6px;
       font-weight: 700;
       color: #f0f0f0;
+      min-height: 44px;
     }
 
     #custom-time {
@@ -805,6 +880,57 @@
       font-family: Consolas, monospace;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+
+      DS4WEB-player {
+        padding: 0 8px 12px;
+      }
+
+      #toolbar {
+        gap: 8px;
+        padding-right: 10px;
+        padding-bottom: 10px;
+        padding-left: 10px;
+        align-items: stretch;
+      }
+
+      #toolbar > button,
+      #toolbar > select,
+      #toolbar > input[type="number"],
+      #toolbar > input[type="datetime-local"] {
+        flex: 1 1 calc(50% - 8px);
+        min-height: 44px;
+        min-width: 0;
+      }
+
+      #toolbar > label,
+      #time-toggle-wrap {
+        flex: 1 1 100%;
+      }
+
+      #speed-slider,
+      #frame-skip {
+        width: 100%;
+        flex: 1 1 100%;
+      }
+
+      #save-status {
+        order: 99;
+      }
+
+      #cheat-panel {
+        margin: 10px 8px 12px;
+      }
+
+      #cheat-actions > button {
+        flex: 1 1 100%;
+        min-height: 44px;
+      }
     }
   </style>
 </html>
