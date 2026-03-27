@@ -1623,6 +1623,13 @@ if (player) {
     for (var vkStickPos, vkMap = {}, vkState = {}, keyNameToKeyId = {}, i = 0; i < e.length; i++) {
         keyNameToKeyId[e[i]] = i;
     };
+    function syncVirtualControls() {
+        document.querySelectorAll("[data-k]").forEach(t => {
+            var r = t.getAttribute("data-k");
+            r && (vkMap[r] = t, vkState[r] || (vkState[r] = [0, 0]));
+        });
+    };
+    syncVirtualControls();
     var isLandscape = !1;
     const t = [39, 37, 40, 38, 16, 13, 90, 88, 65, 83, 81, 87, -1, 8];
     var audioContext, audioBuffer, audioWorkletNode, fbSize, emuGameID = "unknown";
@@ -1921,7 +1928,9 @@ if (player) {
                 return;
             };
             t.preventDefault(), t.stopPropagation();
-            for (var r = !1, n = 0, o = 0, a = !1, i = vkStickPos[0], u = vkStickPos[1], s = vkStickPos[2], l = vkStickPos[3], c = .4 * s, d = null, f = null, m = screenCanvas[1].getBoundingClientRect(), p = 0; p < emuKeyState.length; p++) {
+            syncVirtualControls();
+            var hasVirtualStick = !!(vkStickPos && vkMap.stick);
+            for (var r = !1, n = 0, o = 0, a = !1, i = hasVirtualStick ? vkStickPos[0] : 0, u = hasVirtualStick ? vkStickPos[1] : 0, s = hasVirtualStick ? vkStickPos[2] : 0, l = hasVirtualStick ? vkStickPos[3] : 0, c = .4 * s, d = null, f = null, m = screenCanvas[1].getBoundingClientRect(), p = 0; p < emuKeyState.length; p++) {
                 emuKeyState[p] = !1;
             };
             for (var h in vkState) {
@@ -1930,8 +1939,11 @@ if (player) {
             for (p = 0; p < t.touches.length; p++) {
                 var _ = t.touches[p];
                 var v = _.identifier;
-                h = (g = document.elementFromPoint(_.clientX, _.clientY)) ? g.getAttribute("data-k") : null;
-                if (v === stickTouchID || g == vkMap.stick && v != tpadTouchID) {
+                var g = document.elementFromPoint(_.clientX, _.clientY);
+                var controlTarget = g && "function" == typeof g.closest ? g.closest("[data-k]") : g;
+                h = controlTarget ? controlTarget.getAttribute("data-k") : null;
+                g = controlTarget || g;
+                if (hasVirtualStick && (v === stickTouchID || g == vkMap.stick && v != tpadTouchID)) {
                     !0, vkState.stick[1] = 1;
                     var S = _.clientX;
                     var y = _.clientY;
@@ -1943,13 +1955,13 @@ if (player) {
             for (var h in touched = r ? 1 : 0, touchX = n, touchY = o, vkState)
                 if (vkState[h][0] != vkState[h][1]) {
                     var g = vkMap[h];
-                    vkState[h][0] = vkState[h][1], vkState[h][1] ? (g.classList.add("vk-touched"), "menu" == h && uiSwitchTo("menu")) : (g.classList.remove("vk-touched"), "stick" == h && (a = !0));
+                    g && (vkState[h][0] = vkState[h][1], vkState[h][1] ? (g.classList.add("vk-touched"), "menu" == h && uiSwitchTo("menu")) : (g.classList.remove("vk-touched"), "stick" == h && (a = !0)));
                 };
                 for (p = 0; p < emuKeyState.length; p++) {
                     h = e[p];
                     vkState[h] && vkState[h][1] && (emuKeyState[p] = !0);
                 };
-            a && (vkMap.stick.style = makeVKStyle(i - s / 2, u - s / 2, s, l, vkStickPos[4])), stickTouchID = d, tpadTouchID = f;
+            hasVirtualStick && a && "function" == typeof makeVKStyle && (vkMap.stick.style = makeVKStyle(i - s / 2, u - s / 2, s, l, vkStickPos[4])), stickTouchID = d, tpadTouchID = f;
         };
     };
     function convertKeyCode(e) {

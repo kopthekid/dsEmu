@@ -39,6 +39,34 @@
       <button id="sync-time" type="button">Use Current Time</button>
       <span id="save-status" aria-live="polite"></span>
     </div>
+    <div id="msg-layer" hidden="">
+      <p id="msg-text"></p>
+    </div>
+    <DS4WEB-player id="player"></DS4WEB-player>
+    <div id="mobile-controls" aria-label="Mobile controls">
+      <div class="mobile-controls-row mobile-shoulders">
+        <div class="mobile-control mobile-wide" data-k="l">L</div>
+        <div class="mobile-meta">
+          <div class="mobile-control mobile-pill" data-k="select">Select</div>
+          <div class="mobile-control mobile-pill" data-k="start">Start</div>
+        </div>
+        <div class="mobile-control mobile-wide" data-k="r">R</div>
+      </div>
+      <div class="mobile-controls-row mobile-main">
+        <div class="mobile-dpad" aria-hidden="true">
+          <div class="mobile-control mobile-dpad-up" data-k="up">▲</div>
+          <div class="mobile-control mobile-dpad-left" data-k="left">◀</div>
+          <div class="mobile-control mobile-dpad-right" data-k="right">▶</div>
+          <div class="mobile-control mobile-dpad-down" data-k="down">▼</div>
+        </div>
+        <div class="mobile-actions" aria-hidden="true">
+          <div class="mobile-control mobile-y" data-k="y">Y</div>
+          <div class="mobile-control mobile-x" data-k="x">X</div>
+          <div class="mobile-control mobile-b" data-k="b">B</div>
+          <div class="mobile-control mobile-a" data-k="a">A</div>
+        </div>
+      </div>
+    </div>
     <div id="cheat-panel">
       <label for="cheat-input" id="cheat-label">Cheat Codes (one line each)</label>
       <textarea id="cheat-input" rows="4" placeholder="Example:\n94000130 FCFF0000\nB2101D40 00000000\n00000092 00000063"></textarea>
@@ -49,10 +77,6 @@
       </div>
       <pre id="cheat-list">No cheats loaded.</pre>
     </div>
-    <div id="msg-layer" hidden="">
-      <p id="msg-text"></p>
-    </div>
-    <DS4WEB-player id="player"></DS4WEB-player>
     <script src="DS4WEB/DS4WEB.js"></script>
   </body>
   <script>
@@ -811,6 +835,132 @@
       gap: 8px;
     }
 
+    #mobile-controls {
+      display: none;
+      margin: 0 12px 12px;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(49, 49, 49, 0.95), rgba(27, 27, 27, 0.98));
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      gap: 12px;
+    }
+
+    .mobile-controls-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .mobile-main {
+      align-items: stretch;
+    }
+
+    .mobile-meta {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .mobile-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 52px;
+      min-height: 52px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: linear-gradient(180deg, #4a4a4a, #262626);
+      color: #f8f8f8;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 20px rgba(0, 0, 0, 0.2);
+      touch-action: none;
+    }
+
+    .mobile-control.vk-touched {
+      background: linear-gradient(180deg, #7ad45f, #2b6f2c);
+      transform: translateY(1px) scale(0.98);
+    }
+
+    .mobile-wide {
+      min-width: 72px;
+      padding: 0 16px;
+    }
+
+    .mobile-pill {
+      min-width: 88px;
+      min-height: 44px;
+      border-radius: 999px;
+      font-size: 0.95rem;
+    }
+
+    .mobile-dpad,
+    .mobile-actions {
+      position: relative;
+      width: min(42vw, 180px);
+      height: min(42vw, 180px);
+      flex: 0 0 auto;
+    }
+
+    .mobile-dpad .mobile-control,
+    .mobile-actions .mobile-control {
+      position: absolute;
+      width: min(22vw, 76px);
+      height: min(22vw, 76px);
+      border-radius: 22px;
+    }
+
+    .mobile-dpad-up,
+    .mobile-y {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .mobile-dpad-left,
+    .mobile-b {
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .mobile-dpad-right,
+    .mobile-a {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .mobile-dpad-down,
+    .mobile-x {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .mobile-a {
+      background: linear-gradient(180deg, #d1743f, #87411f);
+    }
+
+    .mobile-b {
+      background: linear-gradient(180deg, #527fd2, #27457f);
+    }
+
+    .mobile-x {
+      background: linear-gradient(180deg, #68975d, #31512c);
+    }
+
+    .mobile-y {
+      background: linear-gradient(180deg, #b69a43, #6a5a1f);
+    }
+
     #cheat-label {
       font-weight: 700;
       color: #f0f0f0;
@@ -930,6 +1080,34 @@
       #cheat-actions > button {
         flex: 1 1 100%;
         min-height: 44px;
+      }
+    }
+
+    @media (pointer: coarse), (max-width: 900px) {
+      #mobile-controls {
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 520px) {
+      #mobile-controls {
+        margin: 0 8px 12px;
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .mobile-controls-row {
+        gap: 10px;
+      }
+
+      .mobile-wide {
+        min-width: 60px;
+        padding: 0 12px;
+      }
+
+      .mobile-pill {
+        min-width: 76px;
       }
     }
   </style>
